@@ -35,13 +35,16 @@
   .bar small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
   .card{background:white;border:1px solid var(--line);border-radius:19px;overflow:hidden;box-shadow:0 7px 22px #dd8ba018}
-  .photoButton{display:block;width:100%;padding:0;border:0;background:#fff0f3;cursor:zoom-in}
+  .photoButton{display:block;position:relative;width:100%;padding:0;border:0;background:#fff0f3;cursor:zoom-in}
   .photoButton:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
   .photo{width:100%;height:225px;object-fit:contain;display:block}
+  .photoLoading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+  .photoLoading[hidden]{display:none}
   .viewer[hidden]{display:none}
   .viewer{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:#24141de8;padding:52px 12px 20px}
   .viewer img{display:block;max-width:100%;max-height:100%;object-fit:contain}
   .viewerClose{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:14px;border:0;border-radius:100px;background:#ffffffed;color:var(--ink);width:38px;height:38px;font-size:25px;cursor:pointer}
+  .viewerStatus{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 10px);left:0;right:0;text-align:center;color:#fff;font-size:12px}
   .details{padding:14px}
   .caption{font-size:15px;line-height:1.6;min-height:24px;margin:0 0 9px;white-space:pre-wrap;overflow-wrap:anywhere}
   .meta{color:var(--muted);font-size:11px}
@@ -72,6 +75,7 @@
 <div class="viewer" id="photoViewer" role="dialog" aria-modal="true" aria-label="查看完整照片" hidden>
   <button class="viewerClose" id="viewerClose" type="button" aria-label="关闭大图">×</button>
   <img id="viewerImage" alt="" />
+  <span class="viewerStatus" id="viewerStatus" aria-live="polite"></span>
 </div>
 <script>
 (function(){
@@ -82,10 +86,17 @@
   var viewer=document.getElementById("photoViewer");
   var viewerImage=document.getElementById("viewerImage");
   var viewerClose=document.getElementById("viewerClose");
+  var viewerStatus=document.getElementById("viewerStatus");
   var viewerTrigger=null;
   var activeUrls=[];
+  var fullUrls=new Map();
+  var previewQueue=[];
+  var activePreviews=0;
+  var loadVersion=0;
+  var viewerVersion=0;
+  var previewObserver="IntersectionObserver" in window?new IntersectionObserver(function(entries){entries.forEach(function(entry){if(entry.isIntersecting){previewObserver.unobserve(entry.target);previewQueue.push(entry.target.previewTask);pumpPreviews()}})},{rootMargin:"350px"}):null;
   var busy=false;
-  function closeViewer(){viewer.hidden=true;viewerImage.removeAttribute("src");document.body.style.overflow="";if(viewerTrigger)viewerTrigger.focus();viewerTrigger=null}
+  function closeViewer(){viewerVersion++;viewer.hidden=true;viewerImage.removeAttribute("src");document.body.style.overflow="";if(viewerTrigger)viewerTrigger.focus();viewerTrigger=null}
   viewerClose.addEventListener("click",closeViewer);
   viewer.addEventListener("click",function(event){if(event.target===viewer)closeViewer()});
   document.addEventListener("keydown",function(event){if(event.key==="Escape"&&!viewer.hidden)closeViewer()});
@@ -102,11 +113,42 @@
       var body=await result.json().catch(function(){return {}});
       if(result.status===401) throw new Error("口令会话已失效，请返回首页重新输入口令");
       if(result.status===413) throw new Error("照片太大了，请选一张小一点的");
-      throw new Error(body.error||"操作失败，请稍后再试");
+      var error=new Error(body.error||"操作失败，请稍后再试");error.status=result.status;throw error;
     }
     return result;
   }
-  function clearImages(){activeUrls.forEach(function(url){URL.revokeObjectURL(url)});activeUrls=[]}
+  function clearImages(){loadVersion++;if(previewObserver)previewObserver.disconnect();previewQueue=[];if(!viewer.hidden)closeViewer();activeUrls.forEach(function(url){URL.revokeObjectURL(url)});activeUrls=[];fullUrls.clear()}
+  function pumpPreviews(){
+    while(activePreviews<3&&previewQueue.length){
+      var task=previewQueue.shift();
+      if(task.version!==loadVersion)continue;
+      activePreviews++;
+      loadPreview(task).finally(function(){activePreviews--;pumpPreviews()});
+    }
+  }
+  async function loadPreview(task){
+    try{
+      var result;
+      try{result=await request("/"+task.photo.id+"/thumb")}
+      catch(error){if(error.status!==404)throw error;result=await request("/"+task.photo.id+"/file")}
+      var url=URL.createObjectURL(await result.blob());
+      if(task.version!==loadVersion){URL.revokeObjectURL(url);return}
+      activeUrls.push(url);task.img.src=url;task.loading.hidden=true;
+    }catch(_){if(task.version===loadVersion)task.loading.textContent="照片暂时无法加载，点刷新重试"}
+  }
+  async function openViewer(photo,img,button){
+    if(!img.hasAttribute("src"))return;
+    viewerTrigger=button;viewerImage.src=img.src;viewerImage.alt=img.alt;viewer.hidden=false;document.body.style.overflow="hidden";viewerClose.focus();
+    var version=++viewerVersion;
+    if(fullUrls.has(photo.id)){viewerImage.src=fullUrls.get(photo.id);viewerStatus.textContent="原图";return}
+    viewerStatus.textContent="正在加载原图…";
+    try{
+      var result=await request("/"+photo.id+"/file");
+      var url=URL.createObjectURL(await result.blob());
+      if(version!==viewerVersion){URL.revokeObjectURL(url);return}
+      activeUrls.push(url);fullUrls.set(photo.id,url);viewerImage.src=url;viewerStatus.textContent="原图";
+    }catch(_){if(version===viewerVersion)viewerStatus.textContent="原图加载失败，当前为预览图"}
+  }
   function empty(text){gallery.innerHTML="";var p=document.createElement("p");p.className="empty";p.textContent=text;gallery.appendChild(p)}
   async function load(){
     empty("正在打开我们的回忆…");
@@ -123,9 +165,10 @@
   }
   async function addCard(photo){
     var card=document.createElement("article");card.className="card";
-    var img=document.createElement("img");img.className="photo";img.alt=photo.caption||"我们的合照";img.loading="lazy";
-    var photoButton=document.createElement("button");photoButton.className="photoButton";photoButton.type="button";photoButton.setAttribute("aria-label","查看完整照片");photoButton.appendChild(img);
-    photoButton.addEventListener("click",function(){if(!img.hasAttribute("src"))return;viewerTrigger=photoButton;viewerImage.src=img.src;viewerImage.alt=img.alt;viewer.hidden=false;document.body.style.overflow="hidden";viewerClose.focus()});
+    var img=document.createElement("img");img.className="photo";img.alt=photo.caption||"我们的合照";
+    var loading=document.createElement("span");loading.className="photoLoading";loading.textContent="照片加载中…";
+    var photoButton=document.createElement("button");photoButton.className="photoButton";photoButton.type="button";photoButton.setAttribute("aria-label","查看完整照片");photoButton.append(img,loading);
+    photoButton.addEventListener("click",function(){openViewer(photo,img,photoButton)});
     var details=document.createElement("div");details.className="details";
     var caption=document.createElement("p");caption.className="caption";caption.textContent=photo.caption||"这一刻，值得收藏 ♡";
     var meta=document.createElement("div");meta.className="meta";meta.textContent=(photo.by==="zhu"?"朱美琳":"吴锐")+" 添加 · "+new Date(photo.createdAt).toLocaleDateString("zh-CN");
@@ -144,8 +187,23 @@
       catch(error){message(error.message)}
     });
     actions.append(edit,remove);details.append(caption,meta,actions);card.append(photoButton,details);gallery.appendChild(card);
-    try{var result=await request("/"+photo.id+"/file");var url=URL.createObjectURL(await result.blob());activeUrls.push(url);img.src=url}
-    catch(_){img.alt="照片暂时无法加载，请刷新重试"}
+    photoButton.previewTask={photo:photo,img:img,loading:loading,version:loadVersion};
+    if(previewObserver)previewObserver.observe(photoButton);else{previewQueue.push(photoButton.previewTask);pumpPreviews()}
+  }
+  function makeThumbnail(file){
+    return new Promise(function(resolve,reject){
+      var url=URL.createObjectURL(file);var image=new Image();
+      image.onload=function(){
+        try{
+          var scale=Math.min(1,720/Math.max(image.naturalWidth,image.naturalHeight));
+          var canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+          var context=canvas.getContext("2d");context.fillStyle="#fff";context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);
+          URL.revokeObjectURL(url);
+          canvas.toBlob(function(blob){if(blob&&blob.size<=512*1024)resolve(blob);else reject(new Error("照片预览生成失败，请换一张照片再试"))},"image/jpeg",.72);
+        }catch(error){URL.revokeObjectURL(url);reject(error)}
+      };
+      image.onerror=function(){URL.revokeObjectURL(url);reject(new Error("这张照片无法读取，请换一张再试"))};image.src=url;
+    });
   }
   document.getElementById("photoInput").addEventListener("change",function(){var file=this.files[0];document.getElementById("fileLabel").textContent=file?file.name:"＋ 选择一张照片"});
   document.getElementById("refreshButton").addEventListener("click",load);
@@ -155,7 +213,7 @@
     if(file.size>6*1024*1024){message("照片不能超过 6 MB，请选一张小一点的");return}
     busy=true;document.getElementById("uploadButton").disabled=true;message("正在保存照片…");
     var form=new FormData();form.append("photo",file);form.append("caption",document.getElementById("captionInput").value.trim());form.append("by",window.LOVE_IDENTITY);
-    try{await request("",{method:"POST",body:form});document.getElementById("uploadForm").reset();document.getElementById("fileLabel").innerHTML="＋ 选择一张照片<br>支持 JPG、PNG、WebP";message("照片已保存，两个人都能看到 ♡");await load()}
+    try{form.append("thumbnail",await makeThumbnail(file),"preview.jpg");await request("",{method:"POST",body:form});document.getElementById("uploadForm").reset();document.getElementById("fileLabel").innerHTML="＋ 选择一张照片<br>支持 JPG、PNG、WebP";message("照片已保存，两个人都能看到 ♡");await load()}
     catch(error){message(error.message)}
     finally{busy=false;document.getElementById("uploadButton").disabled=false}
   });
