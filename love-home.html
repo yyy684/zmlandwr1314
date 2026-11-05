@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>我们的日子</title>
+<style>
+  :root{
+    --sky-top:#241436;      /* 深夜紫 */
+    --sky-mid:#5b3563;      /* 暮色藕荷 */
+    --sky-low:#b95f57;      /* 暖珊瑚 */
+    --sun:#f4b860;          /* 落日金 */
+    --cream:#fcefe3;        /* 奶油字 */
+    --rose:#ff7a8a;         /* 爱心色,克制使用 */
+    --muted:rgba(252,239,227,.62);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--cream);
+    background:
+      radial-gradient(120% 90% at 50% 118%, var(--sun) 0%, var(--sky-low) 22%, var(--sky-mid) 55%, var(--sky-top) 100%);
+    min-height:100dvh;
+    overflow-x:hidden;
+    position:relative;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* 落日光晕 */
+  body::before{
+    content:"";position:fixed;left:50%;bottom:-42vmin;transform:translateX(-50%);
+    width:84vmin;height:84vmin;border-radius:50%;
+    background:radial-gradient(circle, rgba(244,184,96,.55) 0%, rgba(244,184,96,.10) 45%, transparent 68%);
+    filter:blur(6px);pointer-events:none;z-index:0;
+  }
+  canvas#fireflies{position:fixed;inset:0;z-index:1;pointer-events:none}
+
+  .wrap{position:relative;z-index:2;min-height:100dvh;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:calc(env(safe-area-inset-top) + 7vh) 24px calc(env(safe-area-inset-bottom) + 6vh);
+    gap:clamp(20px,4vh,42px)}
+
+  .eyebrow{font-size:13px;letter-spacing:.42em;text-indent:.42em;color:var(--muted);
+    text-transform:uppercase}
+
+  /* 呼吸感天数 —— 页面的主角 */
+  .counter{line-height:.9}
+  .counter .days{
+    font-family:"Songti SC","STSong",Georgia,serif;
+    font-weight:400;font-size:clamp(88px,26vw,240px);
+    letter-spacing:-.02em;
+    background:linear-gradient(180deg,#fff 0%,var(--sun) 130%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 0 42px rgba(244,184,96,.28);
+    animation:breathe 5.2s ease-in-out infinite}
+  @keyframes breathe{50%{filter:brightness(1.12);transform:scale(1.015)}}
+  .counter .unit{display:block;margin-top:10px;font-size:15px;letter-spacing:.32em;
+    text-indent:.32em;color:var(--muted)}
+  .lead{font-family:"Songti SC","STSong",Georgia,serif;font-size:clamp(19px,4.6vw,26px)}
+  .lead b{color:var(--rose);font-weight:400}
+
+  /* 打字机情话 */
+  .typed{min-height:1.7em;font-size:clamp(15px,4vw,19px);color:var(--cream);
+    max-width:22em;line-height:1.7}
+  .caret{display:inline-block;width:2px;height:1.05em;vertical-align:-.15em;
+    background:var(--sun);margin-left:2px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* 里程碑 */
+  .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:30em}
+  .chip{font-size:12.5px;padding:7px 13px;border-radius:999px;
+    border:1px solid rgba(252,239,227,.24);background:rgba(252,239,227,.06);
+    color:var(--muted);backdrop-filter:blur(4px)}
+  .chip b{color:var(--sun);font-weight:600}
+
+  .hugbtn{margin-top:4px;font:inherit;font-size:15px;color:#3a1730;cursor:pointer;
+    border:none;border-radius:999px;padding:13px 30px;
+    background:linear-gradient(135deg,#ffd9a0,var(--rose));
+    box-shadow:0 10px 30px rgba(255,122,138,.35);transition:transform .18s,box-shadow .18s;
+    -webkit-tap-highlight-color:transparent}
+  .hugbtn:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(255,122,138,.5)}
+  .hugbtn:active{transform:translateY(0) scale(.97)}
+  .hugbtn:focus-visible{outline:2px solid var(--sun);outline-offset:3px}
+
+  .hearts{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+  .heart{position:absolute;bottom:-40px;font-size:26px;will-change:transform,opacity;
+    animation:rise linear forwards}
+  @keyframes rise{
+    0%{transform:translateY(0) scale(.6) rotate(0);opacity:0}
+    12%{opacity:1}
+    100%{transform:translateY(-116vh) scale(1.1) rotate(var(--r));opacity:0}}
+
+  @media (prefers-reduced-motion:reduce){
+    .counter .days{animation:none} .caret{animation:none}
+    .heart{animation-duration:.01s!important}
+  }
+</style>
+</head>
+<body>
+<canvas id="fireflies"></canvas>
+
+<main class="wrap">
+  <p class="eyebrow">SINCE <span id="since"></span></p>
+
+  <div class="counter">
+    <span class="days" id="days">—</span>
+    <span class="unit">天,和你在一起</span>
+  </div>
+
+  <p class="lead">你好呀,<b id="her">宝贝</b></p>
+  <p class="typed"><span id="typed"></span><span class="caret" id="caret"></span></p>
+
+  <div class="chips" id="chips"></div>
+
+  <button class="hugbtn" id="hug">给我一个抱抱 🤍</button>
+</main>
+
+<div class="hearts" id="heartLayer" aria-hidden="true"></div>
+
+<script src="config.js"></script>
+<script>
+(function(){
+  const cfg = window.COUPLE_CONFIG || {};
+  const start = new Date((cfg.startDate||"2024-01-01") + "T00:00:00");
+  const now = new Date();
+  const DAY = 86400000;
+  const days = Math.max(0, Math.floor((now - start)/DAY));
+
+  document.getElementById("her").textContent = cfg.herName || "宝贝";
+  document.getElementById("since").textContent =
+    start.getFullYear()+"."+String(start.getMonth()+1).padStart(2,"0")+"."+String(start.getDate()).padStart(2,"0");
+
+  // 天数滚动到位
+  const daysEl = document.getElementById("days");
+  const dur = 1400, t0 = performance.now();
+  (function tick(t){
+    const p = Math.min(1,(t-t0)/dur), e = 1-Math.pow(1-p,3);
+    daysEl.textContent = Math.round(days*e).toLocaleString("en-US");
+    if(p<1) requestAnimationFrame(tick);
+  })(t0);
+
+  // 里程碑
+  const nextHundred = (Math.floor(days/100)+1)*100;
+  const years = Math.floor(days/365);
+  const chips = [];
+  chips.push(`已经一起走过 <b>${(days/7|0)}</b> 个星期`);
+  chips.push(`距离 <b>${nextHundred}</b> 天,还有 <b>${nextHundred-days}</b> 天`);
+  if(years>=1) chips.push(`我们的第 <b>${years+1}</b> 年`);
+  // 下一个每月纪念日(每月的“在一起那天”)
+  const d = start.getDate();
+  let nm = new Date(now.getFullYear(), now.getMonth(), d, 0,0,0);
+  if(nm <= now) nm = new Date(now.getFullYear(), now.getMonth()+1, d);
+  chips.push(`下个月纪念日,还有 <b>${Math.ceil((nm-now)/DAY)}</b> 天`);
+  document.getElementById("chips").innerHTML = chips.map(c=>`<span class="chip">${c}</span>`).join("");
+
+  // 打字机
+  const lines = (cfg.sweetLines&&cfg.sweetLines.length)?cfg.sweetLines:["有你的每一天都值得纪念。"];
+  const out = document.getElementById("typed");
+  const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
+  if(reduce){ out.textContent = lines[0]; }
+  else{
+    let li=0, ci=0;
+    (function type(){
+      const line = lines[li];
+      if(ci<=line.length){ out.textContent = line.slice(0,ci++); setTimeout(type,90); }
+      else setTimeout(()=>{ // 停留后清空换下一句
+        (function erase(){
+          if(ci>0){ out.textContent = line.slice(0,--ci); setTimeout(erase,34); }
+          else{ li=(li+1)%lines.length; setTimeout(type,260); }
+        })();
+      },1900);
+    })();
+  }
+
+  // 萤火虫
+  const cv = document.getElementById("fireflies"), ctx = cv.getContext("2d");
+  let W,H,parts=[];
+  function resize(){ W=cv.width=innerWidth*devicePixelRatio; H=cv.height=innerHeight*devicePixelRatio;
+    cv.style.width=innerWidth+"px"; cv.style.height=innerHeight+"px"; }
+  resize(); addEventListener("resize",resize);
+  const N = reduce?0:Math.min(46, Math.round(innerWidth/24));
+  for(let i=0;i<N;i++) parts.push({
+    x:Math.random()*W, y:Math.random()*H, r:(Math.random()*1.6+.6)*devicePixelRatio,
+    vx:(Math.random()-.5)*.16*devicePixelRatio, vy:(Math.random()-.5)*.16*devicePixelRatio,
+    ph:Math.random()*Math.PI*2, sp:Math.random()*.02+.008
+  });
+  (function loop(){
+    ctx.clearRect(0,0,W,H);
+    for(const p of parts){
+      p.x+=p.vx; p.y+=p.vy; p.ph+=p.sp;
+      if(p.x<0)p.x+=W; if(p.x>W)p.x-=W; if(p.y<0)p.y+=H; if(p.y>H)p.y-=H;
+      const a=.35+.45*Math.sin(p.ph);
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7);
+      ctx.fillStyle=`rgba(244,200,120,${a})`;
+      ctx.shadowColor="rgba(244,200,120,.9)"; ctx.shadowBlur=10*devicePixelRatio;
+      ctx.fill();
+    }
+    ctx.shadowBlur=0;
+    if(N) requestAnimationFrame(loop);
+  })();
+
+  // 抱抱 → 爱心雨
+  const layer = document.getElementById("heartLayer");
+  const emojis = ["💗","🤍","💛","🧡","💕","✨"];
+  document.getElementById("hug").addEventListener("click", ()=>{
+    for(let i=0;i<28;i++){
+      const h=document.createElement("span"); h.className="heart";
+      h.textContent=emojis[i%emojis.length];
+      h.style.left=Math.random()*100+"vw";
+      h.style.fontSize=(18+Math.random()*22)+"px";
+      h.style.setProperty("--r",(Math.random()*80-40)+"deg");
+      h.style.animationDuration=(3.4+Math.random()*2.4)+"s";
+      h.style.animationDelay=(Math.random()*.5)+"s";
+      layer.appendChild(h);
+      setTimeout(()=>h.remove(),6500);
+    }
+  });
+})();
+</script>
+</body>
+</html>
+

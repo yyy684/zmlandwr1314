@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>哄哄模拟器</title>
+<style>
+  :root{--bg:#f6f1f5;--card:#fff;--ink:#33262f;--muted:#a2909c;--me:#ffd0d8;--her:#efe7ee;
+        --accent:#ff6f8e;--good:#5ec98b;--bad:#f0857d;--line:#efe6ee}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:linear-gradient(180deg,#fbeef4,var(--bg));color:var(--ink);min-height:100dvh;
+    display:flex;justify-content:center;-webkit-font-smoothing:antialiased}
+  .app{width:min(100%,460px);min-height:100dvh;display:flex;flex-direction:column;
+    background:var(--bg);position:relative}
+
+  header{padding:calc(env(safe-area-inset-top) + 14px) 18px 12px;background:var(--card);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .who{display:flex;align-items:center;gap:11px}
+  .ava{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#ffc3d0,#ff9db1);
+    display:grid;place-items:center;font-size:22px}
+  .who b{font-size:16px}
+  .who small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .meter{margin-top:12px}
+  .meter .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .meter .row b{color:var(--accent)}
+  .bar{height:10px;border-radius:999px;background:#f0e6ec;overflow:hidden}
+  .fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#ffb0c0,var(--good));
+    transition:width .6s cubic-bezier(.2,.8,.2,1)}
+
+  .log{flex:1;overflow-y:auto;padding:18px 16px 8px;display:flex;flex-direction:column;gap:12px}
+  .scene{align-self:center;background:#fff;border:1px solid var(--line);color:var(--muted);
+    font-size:12.5px;padding:7px 14px;border-radius:999px;text-align:center;max-width:90%}
+  .msg{max-width:78%;padding:11px 14px;border-radius:16px;font-size:15px;line-height:1.5;
+    animation:pop .25s ease}
+  @keyframes pop{from{transform:translateY(6px);opacity:0}}
+  .her{align-self:flex-start;background:var(--her);border-bottom-left-radius:5px}
+  .me{align-self:flex-end;background:var(--me);border-bottom-right-radius:5px}
+  .delta{align-self:center;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px}
+  .delta.up{color:#2f9c63;background:#e6f6ec} .delta.down{color:#c9524a;background:#fce8e6}
+
+  .dock{padding:12px 14px calc(env(safe-area-inset-bottom) + 14px);background:var(--card);
+    border-top:1px solid var(--line)}
+  .quick{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
+  .quick::-webkit-scrollbar{display:none}
+  .quick button{white-space:nowrap;border:1px solid var(--line);background:#fff;color:var(--ink);
+    border-radius:999px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer;flex:none}
+  .inrow{display:flex;gap:9px;align-items:flex-end}
+  textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padding:11px 13px;
+    font:inherit;font-size:15px;max-height:110px;background:#fff}
+  textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+  .send{border:none;background:var(--accent);color:#fff;border-radius:14px;padding:0 18px;height:44px;
+    font:inherit;font-weight:700;cursor:pointer;flex:none}
+  .send:disabled{opacity:.5;cursor:default}
+
+  .win{position:absolute;inset:0;background:rgba(255,240,245,.94);backdrop-filter:blur(3px);
+    display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    text-align:center;padding:30px;z-index:20}
+  .win.show{display:flex}
+  .win .big{font-size:56px}
+  .win h2{font-size:22px}.win p{color:var(--muted);max-width:22em;line-height:1.6}
+  .win button{margin-top:8px;border:none;background:var(--accent);color:#fff;border-radius:999px;
+    padding:12px 26px;font:inherit;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="who">
+      <div class="ava" id="ava">😤</div>
+      <div><b id="herName">她</b><small id="mood">正在生气… 快哄!</small></div>
+    </div>
+    <div class="meter">
+      <div class="row"><span>原谅值</span><b><span id="score">0</span> / 100</b></div>
+      <div class="bar"><div class="fill" id="fill"></div></div>
+    </div>
+  </header>
+
+  <div class="log" id="log"></div>
+
+  <div class="dock">
+    <div class="quick" id="quick"></div>
+    <div class="inrow">
+      <textarea id="input" rows="1" placeholder="说点让她消气的话…" maxlength="120"></textarea>
+      <button class="send" id="send">哄</button>
+    </div>
+  </div>
+
+  <div class="win" id="win">
+    <div class="big" id="winIcon">🎉</div>
+    <h2 id="winTitle">她原谅你啦!</h2>
+    <p id="winText"></p>
+    <button id="again">再玩一次</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+(function(){
+  const cfg=window.COUPLE_CONFIG||{};
+  const herName=cfg.herName||"她", nick=cfg.nickname||"笨蛋";
+  document.getElementById("herName").textContent=herName;
+
+  // —— 生气场景(随机一个)——
+  const SCENES=[
+    {q:`「你根本不懂我为什么生气。」`, hint:"先别急着解释,试试认真问她怎么了 + 认错"},
+    {q:`「说好一起吃饭,你又加班放我鸽子。」`, hint:"承认错误 + 给具体补偿,别找借口"},
+    {q:`「我发的消息你两个小时才回。」`, hint:"别说『在忙』,先道歉 + 让她知道她重要"},
+    {q:`「你是不是觉得我无理取闹?」`, hint:"千万别说『是』,先共情她的情绪"},
+  ];
+  const scene=SCENES[Math.floor(Math.random()*SCENES.length)];
+
+  // —— 她的即时反应台词(按这轮加/减分)——
+  const REACT={
+    great:["…哼,算你有点良心。","这句还差不多。","（嘴角偷偷翘了一下）","好吧好吧,听你的。"],
+    good:["嗯…继续说。","勉强接受。","看你态度还行。"],
+    zero:["就这?","然后呢?","我没感觉到诚意。"],
+    bad:["你还狡辩?!","越说越气!","行,你有理。","你根本没在认错。"],
+  };
+
+  const KW={
+    apolo:{list:["对不起","抱歉","我错了","是我不好","我不该","怪我","我的错"],w:26,tag:"认错"},
+    care :{list:["心疼","在乎","重要","宝贝",herName,nick,"爱你","想你","抱抱","乖"],w:14,tag:"哄"},
+    act  :{list:["补偿","以后","改","请你","陪你","带你","买","保证","再也不"],w:16,tag:"行动"},
+    empa :{list:["理解","懂你","知道你","换成我","你的感受","难受","委屈"],w:15,tag:"共情"},
+    excuse:{list:["但是","可是","不就是","至于","又不是","你也","本来","哪有","无理取闹","随便","烦"],w:-22,tag:"甩锅/敷衍"},
+  };
+  const LOW=["嗯","哦","知道了","好","随便","改天说"];
+
+  let score=0, gameover=false;
+  const log=document.getElementById("log");
+
+  function push(cls,html){const d=document.createElement("div");d.className=cls;d.innerHTML=html;
+    log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+
+  push("scene", scene.q);
+  push("her msg", "（"+herName+"扭过头不看你）");
+  push("scene", "💡 "+scene.hint);
+
+  function evaluate(text){
+    const t=text.trim(); let s=0; const hits=[];
+    for(const k in KW){ const o=KW[k]; let f=false;
+      for(const w of o.list){ if(w&&t.includes(w)){f=true;break;} }
+      if(f){ s+=o.w; if(o.w>0)hits.push(o.tag); }
+    }
+    if(t.length>=18) s+=6;                         // 愿意多说几句
+    if(LOW.includes(t)||t.length<=2) s-=14;        // 敷衍
+    if(/[!!]{2,}/.test(t)) s-=6;                   // 别吼
+    s=Math.max(-25,Math.min(34,s));
+    return {s,hits};
+  }
+
+  function reactLine(delta){
+    const bag = delta>=22?REACT.great : delta>=8?REACT.good : delta>0?REACT.zero : REACT.bad;
+    return bag[Math.floor(Math.random()*bag.length)];
+  }
+
+  function setScore(v){
+    score=Math.max(0,Math.min(100,v));
+    document.getElementById("score").textContent=score;
+    document.getElementById("fill").style.width=score+"%";
+    const ava=document.getElementById("ava"), mood=document.getElementById("mood");
+    if(score>=100){ava.textContent="🥰";mood.textContent="彻底消气了!";}
+    else if(score>=70){ava.textContent="🙂";mood.textContent="快好了,再加把劲";}
+    else if(score>=35){ava.textContent="😐";mood.textContent="有点松动了…";}
+    else{ava.textContent="😤";mood.textContent="还在气头上,小心";}
+  }
+
+  function turn(){
+    if(gameover) return;
+    const inp=document.getElementById("input"), text=inp.value.trim();
+    if(!text) return;
+    push("me msg", esc(text)); inp.value=""; inp.style.height="auto";
+    const {s,hits}=evaluate(text);
+    push("delta "+(s>=0?"up":"down"), (s>=0?"＋":"")+s+" 原谅值"+(hits.length?" · "+hits.join(" "):""));
+    setScore(score+s);
+    setTimeout(()=>{
+      push("her msg", esc(reactLine(s)));
+      if(score>=100) win(true);
+      else if(score<=0 && s<0) push("scene","（她更生气了,换个说法试试)");
+    },420);
+  }
+
+  function win(){
+    gameover=true;
+    document.getElementById("winIcon").textContent="🥰";
+    document.getElementById("winTitle").textContent=herName+"原谅你啦!";
+    document.getElementById("winText").textContent=
+      "满分通关 💯 现实里也别忘了——道歉之后,记得真的做到。快去给她一个抱抱。";
+    document.getElementById("win").classList.add("show");
+  }
+
+  function esc(s){return s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+  // 快捷句
+  const QUICK=["对不起,是我不好,别生气了","我错了,你跟我说说哪里让你难受了","以后我保证改,你说怎么补偿都行",
+    "我知道你不是无理取闹,是我没顾及你的感受",""+nick+",过来抱抱,别气了"];
+  const qb=document.getElementById("quick");
+  QUICK.forEach(q=>{const b=document.createElement("button");b.textContent=q;
+    b.onclick=()=>{document.getElementById("input").value=q;turn();};qb.appendChild(b);});
+
+  const input=document.getElementById("input");
+  input.addEventListener("input",()=>{input.style.height="auto";input.style.height=input.scrollHeight+"px";});
+  input.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();turn();} });
+  document.getElementById("send").addEventListener("click",turn);
+  document.getElementById("again").addEventListener("click",()=>location.reload());
+
+  setScore(0);
+})();
+</script>
+</body>
+</html>
+
