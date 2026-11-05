@@ -35,7 +35,13 @@
   .bar small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
   .card{background:white;border:1px solid var(--line);border-radius:19px;overflow:hidden;box-shadow:0 7px 22px #dd8ba018}
-  .photo{width:100%;height:225px;object-fit:cover;display:block;background:#fff0f3}
+  .photoButton{display:block;width:100%;padding:0;border:0;background:#fff0f3;cursor:zoom-in}
+  .photoButton:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
+  .photo{width:100%;height:225px;object-fit:contain;display:block}
+  .viewer[hidden]{display:none}
+  .viewer{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;background:#24141de8;padding:52px 12px 20px}
+  .viewer img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+  .viewerClose{position:absolute;top:calc(env(safe-area-inset-top) + 10px);right:14px;border:0;border-radius:100px;background:#ffffffed;color:var(--ink);width:38px;height:38px;font-size:25px;cursor:pointer}
   .details{padding:14px}
   .caption{font-size:15px;line-height:1.6;min-height:24px;margin:0 0 9px;white-space:pre-wrap;overflow-wrap:anywhere}
   .meta{color:var(--muted);font-size:11px}
@@ -63,14 +69,26 @@
   <section class="grid" id="gallery" aria-label="共享照片墙"></section>
   <footer>只给知道恋爱口令的人看 · 最多收藏 100 张</footer>
 </main>
+<div class="viewer" id="photoViewer" role="dialog" aria-modal="true" aria-label="查看完整照片" hidden>
+  <button class="viewerClose" id="viewerClose" type="button" aria-label="关闭大图">×</button>
+  <img id="viewerImage" alt="" />
+</div>
 <script>
 (function(){
   "use strict";
   var API="https://photos.zmlandwr1314.top/api/photos";
   var gallery=document.getElementById("gallery");
   var status=document.getElementById("status");
+  var viewer=document.getElementById("photoViewer");
+  var viewerImage=document.getElementById("viewerImage");
+  var viewerClose=document.getElementById("viewerClose");
+  var viewerTrigger=null;
   var activeUrls=[];
   var busy=false;
+  function closeViewer(){viewer.hidden=true;viewerImage.removeAttribute("src");document.body.style.overflow="";if(viewerTrigger)viewerTrigger.focus();viewerTrigger=null}
+  viewerClose.addEventListener("click",closeViewer);
+  viewer.addEventListener("click",function(event){if(event.target===viewer)closeViewer()});
+  document.addEventListener("keydown",function(event){if(event.key==="Escape"&&!viewer.hidden)closeViewer()});
   function code(){return window.LOVE_GATE.getPasscode()}
   function message(value){status.textContent=value}
   async function request(path,options){
@@ -106,6 +124,8 @@
   async function addCard(photo){
     var card=document.createElement("article");card.className="card";
     var img=document.createElement("img");img.className="photo";img.alt=photo.caption||"我们的合照";img.loading="lazy";
+    var photoButton=document.createElement("button");photoButton.className="photoButton";photoButton.type="button";photoButton.setAttribute("aria-label","查看完整照片");photoButton.appendChild(img);
+    photoButton.addEventListener("click",function(){if(!img.hasAttribute("src"))return;viewerTrigger=photoButton;viewerImage.src=img.src;viewerImage.alt=img.alt;viewer.hidden=false;document.body.style.overflow="hidden";viewerClose.focus()});
     var details=document.createElement("div");details.className="details";
     var caption=document.createElement("p");caption.className="caption";caption.textContent=photo.caption||"这一刻，值得收藏 ♡";
     var meta=document.createElement("div");meta.className="meta";meta.textContent=(photo.by==="zhu"?"朱美琳":"吴锐")+" 添加 · "+new Date(photo.createdAt).toLocaleDateString("zh-CN");
@@ -123,7 +143,7 @@
       try{await request("/"+photo.id,{method:"DELETE"});message("照片已删除");await load()}
       catch(error){message(error.message)}
     });
-    actions.append(edit,remove);details.append(caption,meta,actions);card.append(img,details);gallery.appendChild(card);
+    actions.append(edit,remove);details.append(caption,meta,actions);card.append(photoButton,details);gallery.appendChild(card);
     try{var result=await request("/"+photo.id+"/file");var url=URL.createObjectURL(await result.blob());activeUrls.push(url);img.src=url}
     catch(_){img.alt="照片暂时无法加载，请刷新重试"}
   }
