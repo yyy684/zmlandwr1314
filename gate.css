@@ -1,0 +1,19 @@
+
+  html.love-locked body > :not(#love-gate){display:none!important}
+  html.love-locked body{overflow:hidden}
+  #love-gate{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;overflow:auto;padding:calc(env(safe-area-inset-top) + 24px) 20px calc(env(safe-area-inset-bottom) + 24px);background:radial-gradient(circle at 20% 10%,#ffe1ec,transparent 32%),radial-gradient(circle at 85% 85%,#f7e4ff,transparent 35%),#fff7fa;font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#432d38}
+  .love-gate-card{width:min(100%,400px);padding:36px 27px 30px;text-align:center;background:rgba(255,255,255,.94);border:1px solid #f7dce6;border-radius:28px;box-shadow:0 24px 70px rgba(181,91,126,.16)}
+  .love-gate-heart{width:66px;height:66px;margin:0 auto 18px;border-radius:22px;display:grid;place-items:center;background:linear-gradient(145deg,#ffb6cb,#ff789d);color:#fff;font-size:46px;line-height:1;box-shadow:0 10px 22px rgba(255,111,142,.24)}
+  .love-gate-eyebrow{color:#e87c9c;font-size:11px;font-weight:700;letter-spacing:.32em}
+  #love-gate-title{margin:10px 0 8px;font-family:"Songti SC","STSong",serif;font-size:32px;font-weight:600;color:#432d38}
+  .love-gate-description{margin:0 0 28px;color:#9b7d8b;font-size:14px;line-height:1.6}
+  #love-gate-form{text-align:left}
+  #love-gate-form label{display:block;margin-bottom:9px;color:#654b58;font-size:13px;font-weight:600}
+  #love-gate-input{display:block;width:100%;height:52px;padding:0 16px;border:1px solid #efd5df;border-radius:14px;outline:none;background:#fffafd;color:#432d38;font:600 19px "PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.18em;text-align:center}
+  #love-gate-input:focus{border-color:#fa86a7;box-shadow:0 0 0 4px rgba(250,134,167,.14)}
+  #love-gate-input::placeholder{color:#c4aab5;font-size:14px;font-weight:400;letter-spacing:.05em}
+  #love-gate-error{min-height:28px;padding-top:7px;color:#d94d76;font-size:12px;text-align:center}
+  #love-gate-form button{width:100%;height:50px;border:0;border-radius:14px;background:linear-gradient(100deg,#ff7fa3,#f66f97);color:#fff;font:600 15px "PingFang SC","Microsoft YaHei",sans-serif;cursor:pointer;box-shadow:0 10px 20px rgba(246,111,151,.23)}
+  #love-gate-form button:focus-visible{outline:3px solid #d94d76;outline-offset:3px}
+  #love-gate-form button span{margin-left:6px}
+  .love-gate-footer{margin:24px 0 0;color:#b797a5;font-size:11px}
