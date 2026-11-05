@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>给你的小惊喜</title>
-<link rel="stylesheet" href="gate.css" />
-<script src="gate.js"></script>
+<link rel="stylesheet" href="gate.css?v=2" />
+<script src="gate.js?v=2"></script>
 <style>
   :root{--ink:#3a2630;--muted:#9b8590;--card:#fff;--line:#f1e6ec;--accent:#ff6f8e}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -18,6 +18,10 @@
   h1{font-family:"Songti SC","STSong",Georgia,serif;font-weight:400;font-size:30px;margin:10px 0 6px}
   h1 b{color:var(--accent);font-weight:400}
   .lead{color:var(--muted);font-size:14px;margin-bottom:26px}
+  .identity-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-12px 0 22px;padding:10px 13px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72);color:var(--muted);font-size:12px}
+  .identity-bar strong{color:var(--ink)}
+  .identity-bar button{border:0;background:none;color:var(--accent);font:inherit;font-weight:600;cursor:pointer}
+  .identity-bar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .grid{display:flex;flex-direction:column;gap:12px}
   a.card{display:flex;align-items:center;gap:15px;text-decoration:none;color:inherit;
     background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px 18px;
@@ -37,8 +41,9 @@
 <body>
   <div class="box">
     <p class="hi">FOR YOU</p>
-    <h1>嘿,<b id="her">宝贝</b> 💛</h1>
-    <p class="lead">吴锐写给朱美琳的小惊喜，随便点开一个玩玩~</p>
+    <h1>嘿,<b id="viewerName">宝贝</b> 💛</h1>
+    <p class="lead">吴锐和朱美琳的专属小世界，随便点开一个玩玩~</p>
+    <div class="identity-bar"><span>当前身份：<strong id="currentIdentity">待选择</strong></span><button type="button" id="switchIdentity">切换身份</button></div>
 
     <nav class="grid">
       <a class="card" href="love-home.html">
@@ -48,7 +53,7 @@
       </a>
       <a class="card" href="honghong.html">
         <span class="emoji">🥺</span>
-        <span class="t"><b>哄哄模拟器</b><small>要是我惹你生气了…你先玩这个</small></span>
+        <span class="t"><b>哄哄模拟器</b><small>看看今天怎么把对方哄开心</small></span>
         <span class="arrow">→</span>
       </a>
       <a class="card" href="food-wheel.html">
@@ -64,7 +69,14 @@
 <script src="config.js"></script>
 <script>
   var c = window.COUPLE_CONFIG || {};
-  document.getElementById("her").textContent = c.herName || "宝贝";
+  function showViewer() {
+    var isZhu = window.LOVE_IDENTITY === "zhu";
+    document.getElementById("viewerName").textContent = isZhu ? (c.nickname || c.herName || "朱美琳") : (c.myName || "吴锐");
+    document.getElementById("currentIdentity").textContent = isZhu ? (c.herName || "朱美琳") : (c.myName || "吴锐");
+  }
+  document.getElementById("switchIdentity").addEventListener("click", function () { window.LOVE_GATE.switchIdentity(); });
+  if (window.LOVE_IDENTITY) showViewer();
+  else document.addEventListener("love:ready", showViewer, {once:true});
   document.title = "给" + (c.herName || "你") + "的小惊喜";
 </script>
 </body>

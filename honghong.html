@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>哄哄模拟器</title>
-<link rel="stylesheet" href="gate.css" />
-<script src="gate.js"></script>
+<link rel="stylesheet" href="gate.css?v=2" />
+<script src="gate.js?v=2"></script>
 <style>
   :root{--bg:#f6f1f5;--card:#fff;--ink:#33262f;--muted:#a2909c;--me:#ffd0d8;--her:#efe7ee;
         --accent:#ff6f8e;--good:#5ec98b;--bad:#f0857d;--line:#efe6ee}
@@ -19,10 +19,13 @@
   header{padding:calc(env(safe-area-inset-top) + 14px) 18px 12px;background:var(--card);
     border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
   .who{display:flex;align-items:center;gap:11px}
+  .who-person{min-width:0}
   .ava{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#ffc3d0,#ff9db1);
     display:grid;place-items:center;font-size:22px}
   .who b{font-size:16px}
   .who small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .switch-id{margin-left:auto;flex:none;border:1px solid var(--line);border-radius:999px;background:#fff7fa;color:#bb6885;padding:7px 10px;font:inherit;font-size:11px;cursor:pointer}
+  .switch-id:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .meter{margin-top:12px}
   .meter .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:5px}
   .meter .row b{color:var(--accent)}
@@ -36,7 +39,7 @@
   .msg{max-width:78%;padding:11px 14px;border-radius:16px;font-size:15px;line-height:1.5;
     animation:pop .25s ease}
   @keyframes pop{from{transform:translateY(6px);opacity:0}}
-  .her{align-self:flex-start;background:var(--her);border-bottom-left-radius:5px}
+  .target{align-self:flex-start;background:var(--her);border-bottom-left-radius:5px}
   .me{align-self:flex-end;background:var(--me);border-bottom-right-radius:5px}
   .delta{align-self:center;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px}
   .delta.up{color:#2f9c63;background:#e6f6ec} .delta.down{color:#c9524a;background:#fce8e6}
@@ -70,7 +73,8 @@
   <header>
     <div class="who">
       <div class="ava" id="ava">😤</div>
-      <div><b id="herName">她</b><small id="mood">正在生气… 快哄!</small></div>
+      <div class="who-person"><b id="targetName">对方</b><small id="mood">正在生气… 快哄!</small></div>
+      <button class="switch-id" id="switchIdentity" type="button">切换身份</button>
     </div>
     <div class="meter">
       <div class="row"><span>原谅值</span><b><span id="score">0</span> / 100</b></div>
@@ -83,14 +87,14 @@
   <div class="dock">
     <div class="quick" id="quick"></div>
     <div class="inrow">
-      <textarea id="input" rows="1" placeholder="说点让她消气的话…" maxlength="120"></textarea>
+      <textarea id="input" rows="1" placeholder="说点让对方消气的话…" maxlength="120"></textarea>
       <button class="send" id="send">哄</button>
     </div>
   </div>
 
   <div class="win" id="win">
     <div class="big" id="winIcon">🎉</div>
-    <h2 id="winTitle">她原谅你啦!</h2>
+    <h2 id="winTitle">对方原谅你啦!</h2>
     <p id="winText"></p>
     <button id="again">再玩一次</button>
   </div>
@@ -99,20 +103,26 @@
 <script src="config.js"></script>
 <script>
 (function(){
+  function startGame(){
   const cfg=window.COUPLE_CONFIG||{};
-  const herName=cfg.herName||"她", nick=cfg.nickname||"笨蛋";
-  document.getElementById("herName").textContent=herName;
+  const isZhu=window.LOVE_IDENTITY==="zhu";
+  const targetName=isZhu?(cfg.myName||"吴锐"):(cfg.herName||"朱美琳");
+  const targetNick=isZhu?targetName:(cfg.nickname||targetName);
+  const ta=isZhu?"他":"她";
+  document.getElementById("targetName").textContent=targetName;
+  document.getElementById("input").placeholder="说点让"+ta+"消气的话…";
+  document.getElementById("switchIdentity").addEventListener("click",()=>window.LOVE_GATE.switchIdentity());
 
   // —— 生气场景(随机一个)——
   const SCENES=[
-    {q:`「你根本不懂我为什么生气。」`, hint:"先别急着解释,试试认真问她怎么了 + 认错"},
+    {q:`「你根本不懂我为什么生气。」`, hint:`先别急着解释,试试认真问${ta}怎么了 + 认错`},
     {q:`「说好一起吃饭,你又加班放我鸽子。」`, hint:"承认错误 + 给具体补偿,别找借口"},
-    {q:`「我发的消息你两个小时才回。」`, hint:"别说『在忙』,先道歉 + 让她知道她重要"},
-    {q:`「你是不是觉得我无理取闹?」`, hint:"千万别说『是』,先共情她的情绪"},
+    {q:`「我发的消息你两个小时才回。」`, hint:`别说『在忙』,先道歉 + 让${ta}知道${ta}重要`},
+    {q:`「你是不是觉得我无理取闹?」`, hint:`千万别说『是』,先共情${ta}的情绪`},
   ];
   const scene=SCENES[Math.floor(Math.random()*SCENES.length)];
 
-  // —— 她的即时反应台词(按这轮加/减分)——
+  // —— 对方的即时反应台词(按这轮加/减分)——
   const REACT={
     great:["…哼,算你有点良心。","这句还差不多。","（嘴角偷偷翘了一下）","好吧好吧,听你的。"],
     good:["嗯…继续说。","勉强接受。","看你态度还行。"],
@@ -122,7 +132,7 @@
 
   const KW={
     apolo:{list:["对不起","抱歉","我错了","是我不好","我不该","怪我","我的错"],w:26,tag:"认错"},
-    care :{list:["心疼","在乎","重要","宝贝",herName,nick,"爱你","想你","抱抱","乖"],w:14,tag:"哄"},
+    care :{list:["心疼","在乎","重要","宝贝",targetName,targetNick,"爱你","想你","抱抱","乖"],w:14,tag:"哄"},
     act  :{list:["补偿","以后","改","请你","陪你","带你","买","保证","再也不"],w:16,tag:"行动"},
     empa :{list:["理解","懂你","知道你","换成我","你的感受","难受","委屈"],w:15,tag:"共情"},
     excuse:{list:["但是","可是","不就是","至于","又不是","你也","本来","哪有","无理取闹","随便","烦"],w:-22,tag:"甩锅/敷衍"},
@@ -136,7 +146,7 @@
     log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
 
   push("scene", scene.q);
-  push("her msg", "（"+herName+"扭过头不看你）");
+  push("target msg", "（"+targetName+"扭过头不看你）");
   push("scene", "💡 "+scene.hint);
 
   function evaluate(text){
@@ -177,18 +187,18 @@
     push("delta "+(s>=0?"up":"down"), (s>=0?"＋":"")+s+" 原谅值"+(hits.length?" · "+hits.join(" "):""));
     setScore(score+s);
     setTimeout(()=>{
-      push("her msg", esc(reactLine(s)));
+      push("target msg", esc(reactLine(s)));
       if(score>=100) win(true);
-      else if(score<=0 && s<0) push("scene","（她更生气了,换个说法试试)");
+      else if(score<=0 && s<0) push("scene","（"+ta+"更生气了,换个说法试试)");
     },420);
   }
 
   function win(){
     gameover=true;
     document.getElementById("winIcon").textContent="🥰";
-    document.getElementById("winTitle").textContent=herName+"原谅你啦!";
+    document.getElementById("winTitle").textContent=targetName+"原谅你啦!";
     document.getElementById("winText").textContent=
-      "满分通关 💯 现实里也别忘了——道歉之后,记得真的做到。快去给她一个抱抱。";
+      "满分通关 💯 现实里也别忘了——道歉之后,记得真的做到。快去给"+ta+"一个抱抱。";
     document.getElementById("win").classList.add("show");
   }
 
@@ -196,7 +206,7 @@
 
   // 快捷句
   const QUICK=["对不起,是我不好,别生气了","我错了,你跟我说说哪里让你难受了","以后我保证改,你说怎么补偿都行",
-    "我知道你不是无理取闹,是我没顾及你的感受",""+nick+",过来抱抱,别气了"];
+    "我知道你不是无理取闹,是我没顾及你的感受",targetNick+",过来抱抱,别气了"];
   const qb=document.getElementById("quick");
   QUICK.forEach(q=>{const b=document.createElement("button");b.textContent=q;
     b.onclick=()=>{document.getElementById("input").value=q;turn();};qb.appendChild(b);});
@@ -208,6 +218,9 @@
   document.getElementById("again").addEventListener("click",()=>location.reload());
 
   setScore(0);
+  }
+  if(window.LOVE_IDENTITY) startGame();
+  else document.addEventListener("love:ready",startGame,{once:true});
 })();
 </script>
 </body>

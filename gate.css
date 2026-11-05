@@ -17,3 +17,10 @@
   #love-gate-form button:focus-visible{outline:3px solid #d94d76;outline-offset:3px}
   #love-gate-form button span{margin-left:6px}
   .love-gate-footer{margin:24px 0 0;color:#b797a5;font-size:11px}
+  .love-gate-choices{display:grid;gap:12px;margin-top:4px}
+  .love-gate-choice{display:flex;align-items:center;gap:8px;width:100%;min-height:62px;padding:12px 17px;border:1px solid #f1d5e0;border-radius:16px;background:#fff9fc;color:#6e5260;font:inherit;cursor:pointer;text-align:left;transition:transform .16s,border-color .16s,box-shadow .16s}
+  .love-gate-choice:hover{transform:translateY(-2px);border-color:#f39ab5;box-shadow:0 8px 18px rgba(246,111,151,.12)}
+  .love-gate-choice:focus-visible{outline:3px solid #d94d76;outline-offset:3px}
+  .love-gate-choice span{font-size:13px}
+  .love-gate-choice strong{font-size:18px;color:#48303d}
+  .love-gate-choice i{margin-left:auto;color:#ef7fa2;font-size:20px;font-style:normal}
