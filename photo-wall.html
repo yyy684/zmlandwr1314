@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN" class="love-locked">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>我们的照片墙</title>
+<link rel="stylesheet" href="gate.css?v=2" />
+<script src="gate.js?v=3"></script>
+<style>
+  :root{--ink:#422c36;--muted:#947d88;--pink:#f46b90;--line:#f1dfe7}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100dvh;background:linear-gradient(150deg,#fff3f7,#fffaf9 48%,#f9eff5);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;padding:calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 35px)}
+  .wrap{max-width:760px;margin:auto}
+  .back{color:var(--muted);text-decoration:none;font-size:14px}
+  .back:focus-visible,.button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+  .eyebrow{margin:32px 0 5px;color:var(--pink);font-size:12px;font-weight:700;letter-spacing:.28em}
+  h1{font-family:"Songti SC",serif;font-size:36px;font-weight:400;margin:0}
+  .intro{font-size:14px;line-height:1.7;color:var(--muted);margin:8px 0 22px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 12px 35px #dd8ba022}
+  .panel h2{font-size:17px;margin:0 0 14px}
+  .form{display:grid;gap:12px}
+  label{font-size:13px;color:var(--muted)}
+  .filebox{display:flex;align-items:center;justify-content:center;min-height:116px;border:1.5px dashed #efb5c6;border-radius:16px;background:#fff8fa;color:var(--pink);cursor:pointer;text-align:center;padding:12px}
+  .filebox input{position:absolute;opacity:0;width:1px;height:1px}
+  .filebox span{font-size:14px;line-height:1.6}
+  .filebox:focus-within{outline:2px solid var(--pink);outline-offset:2px}
+  input[type=text]{width:100%;border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:inherit;font-size:14px;color:var(--ink)}
+  .button{border:0;border-radius:13px;background:var(--pink);color:#fff;padding:12px 16px;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+  .button:disabled{opacity:.55;cursor:wait}
+  .button.soft{background:#fff0f4;color:#b94f70}
+  .button.text{background:transparent;color:#b94f70;padding:6px 8px;font-size:13px}
+  .status{font-size:13px;color:var(--muted);min-height:20px;margin:12px 0 0}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:27px 0 15px}
+  .bar h2{font-size:19px;margin:0}
+  .bar small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+  .card{background:white;border:1px solid var(--line);border-radius:19px;overflow:hidden;box-shadow:0 7px 22px #dd8ba018}
+  .photo{width:100%;height:225px;object-fit:cover;display:block;background:#fff0f3}
+  .details{padding:14px}
+  .caption{font-size:15px;line-height:1.6;min-height:24px;margin:0 0 9px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .meta{color:var(--muted);font-size:11px}
+  .actions{display:flex;justify-content:flex-end;gap:4px;margin-top:7px}
+  .empty{grid-column:1/-1;text-align:center;padding:48px 12px;color:var(--muted);border:1px dashed #eec8d5;border-radius:18px;background:#ffffff91;font-size:14px;line-height:1.7}
+  footer{text-align:center;color:#bba7ae;font-size:12px;margin-top:30px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="back" href="index.html">← 回到小世界</a>
+  <p class="eyebrow">OUR MEMORIES</p>
+  <h1>我们的照片墙 ♡</h1>
+  <p class="intro">把想留下来的瞬间放在这里。吴锐和朱美琳看到的是同一面照片墙，也都可以继续编辑。</p>
+  <section class="panel" aria-labelledby="uploadTitle">
+    <h2 id="uploadTitle">添一张新的回忆</h2>
+    <form class="form" id="uploadForm">
+      <label class="filebox"><input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" required /><span id="fileLabel">＋ 选择一张照片<br>支持 JPG、PNG、WebP</span></label>
+      <div><label for="captionInput">这张照片的故事（可留空）</label><input id="captionInput" type="text" maxlength="120" placeholder="例如：那天的晚霞和你" /></div>
+      <button class="button" id="uploadButton" type="submit">放到照片墙上 ♡</button>
+    </form>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </section>
+  <div class="bar"><div><h2>一起收藏的瞬间</h2><small id="count">正在加载…</small></div><button class="button soft" id="refreshButton" type="button">刷新照片</button></div>
+  <section class="grid" id="gallery" aria-label="共享照片墙"></section>
+  <footer>只给知道恋爱口令的人看 · 最多收藏 100 张</footer>
+</main>
+<script>
+(function(){
+  "use strict";
+  var API="https://photos.zmlandwr1314.top/api/photos";
+  var gallery=document.getElementById("gallery");
+  var status=document.getElementById("status");
+  var activeUrls=[];
+  var busy=false;
+  function code(){return window.LOVE_GATE.getPasscode()}
+  function message(value){status.textContent=value}
+  async function request(path,options){
+    options=options||{};
+    var headers=new Headers(options.headers||{});
+    headers.set("Authorization","Bearer "+code());
+    var result;
+    try{result=await fetch(API+path,{...options,headers,cache:"no-store"})}
+    catch(_){throw new Error("照片服务暂时无法连接，请稍后刷新再试")}
+    if(!result.ok){
+      var body=await result.json().catch(function(){return {}});
+      if(result.status===401) throw new Error("口令会话已失效，请返回首页重新输入口令");
+      if(result.status===413) throw new Error("照片太大了，请选一张小一点的");
+      throw new Error(body.error||"操作失败，请稍后再试");
+    }
+    return result;
+  }
+  function clearImages(){activeUrls.forEach(function(url){URL.revokeObjectURL(url)});activeUrls=[]}
+  function empty(text){gallery.innerHTML="";var p=document.createElement("p");p.className="empty";p.textContent=text;gallery.appendChild(p)}
+  async function load(){
+    empty("正在打开我们的回忆…");
+    document.getElementById("count").textContent="正在加载…";
+    try{
+      var result=await request("");
+      var data=await result.json();
+      var photos=Array.isArray(data.photos)?data.photos:[];
+      clearImages();gallery.innerHTML="";
+      document.getElementById("count").textContent="共 "+photos.length+" 张照片";
+      if(!photos.length){empty("这里还没有照片。先放上你们的第一张回忆吧 ♡");return}
+      photos.forEach(function(photo){addCard(photo)});
+    }catch(error){empty(error.message);document.getElementById("count").textContent="加载失败"}
+  }
+  async function addCard(photo){
+    var card=document.createElement("article");card.className="card";
+    var img=document.createElement("img");img.className="photo";img.alt=photo.caption||"我们的合照";img.loading="lazy";
+    var details=document.createElement("div");details.className="details";
+    var caption=document.createElement("p");caption.className="caption";caption.textContent=photo.caption||"这一刻，值得收藏 ♡";
+    var meta=document.createElement("div");meta.className="meta";meta.textContent=(photo.by==="zhu"?"朱美琳":"吴锐")+" 添加 · "+new Date(photo.createdAt).toLocaleDateString("zh-CN");
+    var actions=document.createElement("div");actions.className="actions";
+    var edit=document.createElement("button");edit.className="button text";edit.type="button";edit.textContent="编辑说明";
+    var remove=document.createElement("button");remove.className="button text";remove.type="button";remove.textContent="删除";
+    edit.addEventListener("click",async function(){
+      var value=prompt("修改这张照片的说明",photo.caption||"");if(value===null)return;
+      if(value.trim().length>120){message("说明最多 120 个字");return}
+      try{await request("/"+photo.id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({caption:value.trim()})});photo.caption=value.trim();caption.textContent=photo.caption||"这一刻，值得收藏 ♡";message("照片说明已更新，两个人都能看到")}
+      catch(error){message(error.message)}
+    });
+    remove.addEventListener("click",async function(){
+      if(!confirm("确定从共享照片墙删除这张照片吗？两个人都会看不到它。"))return;
+      try{await request("/"+photo.id,{method:"DELETE"});message("照片已删除");await load()}
+      catch(error){message(error.message)}
+    });
+    actions.append(edit,remove);details.append(caption,meta,actions);card.append(img,details);gallery.appendChild(card);
+    try{var result=await request("/"+photo.id+"/file");var url=URL.createObjectURL(await result.blob());activeUrls.push(url);img.src=url}
+    catch(_){img.alt="照片暂时无法加载，请刷新重试"}
+  }
+  document.getElementById("photoInput").addEventListener("change",function(){var file=this.files[0];document.getElementById("fileLabel").textContent=file?file.name:"＋ 选择一张照片"});
+  document.getElementById("refreshButton").addEventListener("click",load);
+  document.getElementById("uploadForm").addEventListener("submit",async function(event){
+    event.preventDefault();if(busy)return;
+    var file=document.getElementById("photoInput").files[0];if(!file){message("先选一张照片吧");return}
+    if(file.size>6*1024*1024){message("照片不能超过 6 MB，请选一张小一点的");return}
+    busy=true;document.getElementById("uploadButton").disabled=true;message("正在保存照片…");
+    var form=new FormData();form.append("photo",file);form.append("caption",document.getElementById("captionInput").value.trim());form.append("by",window.LOVE_IDENTITY);
+    try{await request("",{method:"POST",body:form});document.getElementById("uploadForm").reset();document.getElementById("fileLabel").innerHTML="＋ 选择一张照片<br>支持 JPG、PNG、WebP";message("照片已保存，两个人都能看到 ♡");await load()}
+    catch(error){message(error.message)}
+    finally{busy=false;document.getElementById("uploadButton").disabled=false}
+  });
+  if(window.LOVE_IDENTITY)load();else document.addEventListener("love:ready",load,{once:true});
+})();
+</script>
+</body>
+</html>

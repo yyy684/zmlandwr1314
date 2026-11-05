@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>哄哄模拟器</title>
 <link rel="stylesheet" href="gate.css?v=2" />
-<script src="gate.js?v=2"></script>
+<script src="gate.js?v=3"></script>
 <style>
   :root{--bg:#f6f1f5;--card:#fff;--ink:#33262f;--muted:#a2909c;--me:#ffd0d8;--her:#efe7ee;
         --accent:#ff6f8e;--good:#5ec98b;--bad:#f0857d;--line:#efe6ee}
@@ -73,7 +73,7 @@
   <header>
     <div class="who">
       <div class="ava" id="ava">😤</div>
-      <div class="who-person"><b id="targetName">对方</b><small id="mood">正在生气… 快哄!</small></div>
+      <div class="who-person"><b id="targetName">对方</b><small id="mood">正在生气… 快哄!</small><small id="viewerLabel">当前身份：待选择</small></div>
       <button class="switch-id" id="switchIdentity" type="button">切换身份</button>
     </div>
     <div class="meter">
@@ -110,6 +110,7 @@
   const targetNick=isZhu?targetName:(cfg.nickname||targetName);
   const ta=isZhu?"他":"她";
   document.getElementById("targetName").textContent=targetName;
+  document.getElementById("viewerLabel").textContent="当前身份："+(isZhu?(cfg.herName||"朱美琳"):(cfg.myName||"吴锐"));
   document.getElementById("input").placeholder="说点让"+ta+"消气的话…";
   document.getElementById("switchIdentity").addEventListener("click",()=>window.LOVE_GATE.switchIdentity());
 
