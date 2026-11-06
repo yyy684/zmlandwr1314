@@ -43,6 +43,20 @@
   .me{align-self:flex-end;background:var(--me);border-bottom-right-radius:5px}
   .delta{align-self:center;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px}
   .delta.up{color:#2f9c63;background:#e6f6ec} .delta.down{color:#c9524a;background:#fce8e6}
+  .tabs{display:flex;gap:8px;padding:9px 14px;background:#fff;border-bottom:1px solid var(--line)}
+  .tabs button{flex:1;border:0;border-radius:10px;padding:9px;background:#f7edf2;color:#8c6c7d;font:inherit;font-size:13px}
+  .tabs button.selected{background:var(--accent);color:#fff}
+  .log[hidden],.dock[hidden]{display:none}
+  .shared-panel{padding:12px 16px;background:#fff9fb;border-bottom:1px solid var(--line);font-size:13px}
+  .shared-panel[hidden]{display:none}
+  .shared-panel .score-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .shared-panel input{width:65px;padding:7px;border:1px solid var(--line);border-radius:8px;font:inherit}
+  .shared-panel button{border:0;border-radius:8px;background:var(--accent);color:white;padding:8px 11px;font:inherit}
+  .shared-message{max-width:82%;padding:10px 13px;border-radius:14px;background:var(--her);align-self:flex-start;overflow-wrap:anywhere}
+  .shared-message.mine{background:var(--me);align-self:flex-end}
+  .shared-message small{display:block;color:#8a7480;font-size:11px;margin-bottom:5px}
+  .shared-note{align-self:center;color:var(--muted);font-size:12px;text-align:center;line-height:1.5}
+  .shared-status{min-height:18px;color:var(--muted);font-size:12px;margin-bottom:7px}
 
   .dock{padding:12px 14px calc(env(safe-area-inset-bottom) + 14px);background:var(--card);
     border-top:1px solid var(--line)}
@@ -77,19 +91,29 @@
       <button class="switch-id" id="switchIdentity" type="button">切换身份</button>
     </div>
     <div class="meter">
-      <div class="row"><span>原谅值</span><b><span id="score">0</span> / 100</b></div>
+      <div class="row"><span>模拟原谅值</span><b><span id="score">0</span> / 100</b></div>
       <div class="bar"><div class="fill" id="fill"></div></div>
     </div>
   </header>
 
+  <div class="tabs"><button id="simTab" class="selected" type="button">模拟练习</button><button id="sharedTab" type="button">两人的留言</button></div>
+  <div class="shared-panel" id="sharedPanel" hidden>
+    <div><span id="theirScoreLabel">对方设置的原谅值</span>：<b id="theirScore">0</b> / 100</div>
+    <div class="score-row"><label for="myScore">我给对方的原谅值</label><input id="myScore" type="number" min="0" max="100" value="0" /><button id="saveScore" type="button">保存</button></div>
+  </div>
   <div class="log" id="log"></div>
+  <div class="log" id="sharedLog" hidden></div>
 
-  <div class="dock">
+  <div class="dock" id="simDock">
     <div class="quick" id="quick"></div>
     <div class="inrow">
       <textarea id="input" rows="1" placeholder="说点让对方消气的话…" maxlength="120"></textarea>
       <button class="send" id="send">哄</button>
     </div>
+  </div>
+  <div class="dock" id="sharedDock" hidden>
+    <div class="shared-status" id="sharedStatus" role="status" aria-live="polite"></div>
+    <div class="inrow"><textarea id="replyInput" rows="1" maxlength="120" placeholder="给对方留言或回复…"></textarea><button class="send" id="replySend" type="button">发送</button></div>
   </div>
 
   <div class="win" id="win">
@@ -142,6 +166,76 @@
 
   let score=0, gameover=false;
   const log=document.getElementById("log");
+  const identity=window.LOVE_IDENTITY;
+  const sharedLog=document.getElementById("sharedLog");
+  const sharedStatus=document.getElementById("sharedStatus");
+  const sharedApi="https://photos.zmlandwr1314.top/api/honghong";
+  let sharedOpen=false, lastMessageCount=-1, sending=false;
+
+  async function sharedRequest(path,options={}){
+    const headers=new Headers(options.headers||{});
+    headers.set("Authorization","Bearer "+window.LOVE_GATE.getPasscode());
+    let response;
+    try{response=await fetch(sharedApi+path,{...options,headers,cache:"no-store"})}
+    catch(_){throw new Error("留言服务暂时无法连接")}
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||"操作失败，请稍后重试")}
+    return response.status===204?null:response.json();
+  }
+  function showTab(shared){
+    sharedOpen=shared;
+    document.getElementById("simTab").classList.toggle("selected",!shared);
+    document.getElementById("sharedTab").classList.toggle("selected",shared);
+    document.getElementById("log").hidden=shared;
+    sharedLog.hidden=!shared;
+    document.getElementById("simDock").hidden=shared;
+    document.getElementById("sharedDock").hidden=!shared;
+    document.getElementById("sharedPanel").hidden=!shared;
+    if(shared)refreshShared();
+  }
+  async function refreshShared(){
+    try{
+      const data=await sharedRequest("");
+      document.getElementById("theirScoreLabel").textContent=targetName+"设置的原谅值";
+      document.getElementById("theirScore").textContent=data.scores[isZhu?"wu":"zhu"];
+      if(document.activeElement!==document.getElementById("myScore"))document.getElementById("myScore").value=data.scores[identity];
+      if(data.messages.length===lastMessageCount)return;
+      const nearBottom=sharedLog.scrollHeight-sharedLog.scrollTop-sharedLog.clientHeight<100;
+      sharedLog.replaceChildren();
+      const note=document.createElement("div");note.className="shared-note";note.textContent="这里是真实留言。模拟角色的自动回复只在练习页显示。";sharedLog.appendChild(note);
+      data.messages.forEach(function(item){
+        const card=document.createElement("div");card.className="shared-message"+(item.by===identity?" mine":"");
+        const meta=document.createElement("small");meta.textContent=(item.by==="zhu"?(cfg.herName||"朱美琳"):(cfg.myName||"吴锐"))+" · "+new Date(item.createdAt).toLocaleString("zh-CN");
+        const body=document.createElement("div");body.textContent=item.text;card.append(meta,body);sharedLog.appendChild(card);
+      });
+      lastMessageCount=data.messages.length;
+      if(nearBottom||lastMessageCount===0)sharedLog.scrollTop=sharedLog.scrollHeight;
+      sharedStatus.textContent="";
+    }catch(error){sharedStatus.textContent=error.message}
+  }
+  async function postShared(text){
+    await sharedRequest("",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({by:identity,text})});
+    lastMessageCount=-1;
+    if(sharedOpen)await refreshShared();
+  }
+  document.getElementById("simTab").addEventListener("click",()=>showTab(false));
+  document.getElementById("sharedTab").addEventListener("click",()=>showTab(true));
+  document.getElementById("replySend").addEventListener("click",async function(){
+    const input=document.getElementById("replyInput"),text=input.value.trim();if(!text||sending)return;
+    sending=true;this.disabled=true;sharedStatus.textContent="正在发送…";
+    try{await postShared(text);input.value="";sharedStatus.textContent="已发送，对方打开页面就能看到"}
+    catch(error){sharedStatus.textContent=error.message}
+    finally{sending=false;this.disabled=false}
+  });
+  document.getElementById("replyInput").addEventListener("keydown",function(event){if(event.key==="Enter"&&!event.shiftKey){event.preventDefault();document.getElementById("replySend").click()}});
+  document.getElementById("saveScore").addEventListener("click",async function(){
+    const value=Number(document.getElementById("myScore").value);
+    if(!Number.isInteger(value)||value<0||value>100){sharedStatus.textContent="原谅值请输入 0 到 100 的整数";return}
+    this.disabled=true;
+    try{await sharedRequest("/score",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({by:identity,value})});sharedStatus.textContent="我的原谅值已更新，对方能看到"}
+    catch(error){sharedStatus.textContent=error.message}
+    finally{this.disabled=false}
+  });
+  setInterval(function(){if(sharedOpen&&!document.hidden)refreshShared()},8000);
 
   function push(cls,html){const d=document.createElement("div");d.className=cls;d.innerHTML=html;
     log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
@@ -149,6 +243,7 @@
   push("scene", scene.q);
   push("target msg", "（"+targetName+"扭过头不看你）");
   push("scene", "💡 "+scene.hint);
+  push("scene", "模拟反应仅供练习；你发送的话会同步给对方");
 
   function evaluate(text){
     const t=text.trim(); let s=0; const hits=[];
@@ -179,10 +274,14 @@
     else{ava.textContent="😤";mood.textContent="还在气头上,小心";}
   }
 
-  function turn(){
+  async function turn(){
     if(gameover) return;
     const inp=document.getElementById("input"), text=inp.value.trim();
     if(!text) return;
+    const send=document.getElementById("send");if(send.disabled)return;
+    send.disabled=true;send.textContent="发送中";
+    try{await postShared(text)}catch(error){push("scene","发送失败："+esc(error.message));send.disabled=false;send.textContent="哄";return}
+    send.disabled=false;send.textContent="哄";
     push("me msg", esc(text)); inp.value=""; inp.style.height="auto";
     const {s,hits}=evaluate(text);
     push("delta "+(s>=0?"up":"down"), (s>=0?"＋":"")+s+" 原谅值"+(hits.length?" · "+hits.join(" "):""));
