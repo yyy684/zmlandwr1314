@@ -170,7 +170,13 @@
   const sharedLog=document.getElementById("sharedLog");
   const sharedStatus=document.getElementById("sharedStatus");
   const sharedApi="https://photos.zmlandwr1314.top/api/honghong";
-  let sharedOpen=false, lastMessageCount=-1, sending=false;
+  const cacheKey="love-shared-chat-v1";
+  let sharedOpen=false, lastMessageCount=-1, sending=false, refreshing=false, sharedRevision=0;
+  let cachedShared=null;
+  try{cachedShared=JSON.parse(sessionStorage.getItem(cacheKey)||"null")}catch(_){cachedShared=null}
+  if(!cachedShared||!Array.isArray(cachedShared.messages)||!cachedShared.scores)cachedShared=null;
+
+  function rememberShared(data){cachedShared=data;try{sessionStorage.setItem(cacheKey,JSON.stringify(data))}catch(_){}}
 
   async function sharedRequest(path,options={}){
     const headers=new Headers(options.headers||{});
@@ -190,11 +196,13 @@
     document.getElementById("simDock").hidden=shared;
     document.getElementById("sharedDock").hidden=!shared;
     document.getElementById("sharedPanel").hidden=!shared;
-    if(shared)refreshShared();
+    if(shared){
+      if(cachedShared){lastMessageCount=-1;renderShared(cachedShared);sharedStatus.textContent="正在同步最新留言…"}
+      else sharedStatus.textContent="正在加载留言…";
+      refreshShared();
+    }
   }
-  async function refreshShared(){
-    try{
-      const data=await sharedRequest("");
+  function renderShared(data){
       document.getElementById("theirScoreLabel").textContent=targetName+"设置的原谅值";
       document.getElementById("theirScore").textContent=data.scores[isZhu?"wu":"zhu"];
       if(document.activeElement!==document.getElementById("myScore"))document.getElementById("myScore").value=data.scores[identity];
@@ -209,13 +217,25 @@
       });
       lastMessageCount=data.messages.length;
       if(nearBottom||lastMessageCount===0)sharedLog.scrollTop=sharedLog.scrollHeight;
-      sharedStatus.textContent="";
-    }catch(error){sharedStatus.textContent=error.message}
+  }
+  async function refreshShared(){
+    if(refreshing)return;
+    refreshing=true;
+    const revision=sharedRevision;
+    try{
+      const data=await sharedRequest("");
+      if(revision!==sharedRevision)return;
+      rememberShared(data);renderShared(data);
+      if(sharedOpen)sharedStatus.textContent="";
+    }catch(error){if(sharedOpen)sharedStatus.textContent=error.message}
+    finally{refreshing=false}
   }
   async function postShared(text){
-    await sharedRequest("",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({by:identity,text})});
-    lastMessageCount=-1;
-    if(sharedOpen)await refreshShared();
+    const result=await sharedRequest("",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({by:identity,text})});
+    sharedRevision++;
+    const next=cachedShared?{messages:[...cachedShared.messages,result.message],scores:cachedShared.scores}:{messages:[result.message],scores:{wu:0,zhu:0}};
+    rememberShared(next);lastMessageCount=-1;renderShared(next);
+    if(sharedOpen)refreshShared();
   }
   document.getElementById("simTab").addEventListener("click",()=>showTab(false));
   document.getElementById("sharedTab").addEventListener("click",()=>showTab(true));
@@ -231,7 +251,7 @@
     const value=Number(document.getElementById("myScore").value);
     if(!Number.isInteger(value)||value<0||value>100){sharedStatus.textContent="原谅值请输入 0 到 100 的整数";return}
     this.disabled=true;
-    try{await sharedRequest("/score",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({by:identity,value})});sharedStatus.textContent="我的原谅值已更新，对方能看到"}
+    try{await sharedRequest("/score",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({by:identity,value})});sharedRevision++;if(cachedShared){cachedShared.scores[identity]=value;rememberShared(cachedShared);renderShared(cachedShared)}sharedStatus.textContent="我的原谅值已更新，对方能看到"}
     catch(error){sharedStatus.textContent=error.message}
     finally{this.disabled=false}
   });
@@ -318,6 +338,7 @@
   document.getElementById("again").addEventListener("click",()=>location.reload());
 
   setScore(0);
+  refreshShared();
   }
   if(window.LOVE_IDENTITY) startGame();
   else document.addEventListener("love:ready",startGame,{once:true});
