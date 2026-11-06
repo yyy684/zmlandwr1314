@@ -74,6 +74,13 @@
     border:1px solid rgba(252,239,227,.24);background:rgba(252,239,227,.06);
     color:var(--muted);backdrop-filter:blur(4px)}
   .chip b{color:var(--sun);font-weight:600}
+  .weather{width:min(100%,350px);padding:16px 18px;border:1px solid rgba(252,239,227,.24);border-radius:18px;background:rgba(252,239,227,.08);backdrop-filter:blur(6px)}
+  .weather button{border:1px solid rgba(252,239,227,.45);border-radius:999px;background:rgba(252,239,227,.12);color:var(--cream);font:inherit;font-size:14px;padding:9px 16px;cursor:pointer}
+  .weather button:disabled{opacity:.65;cursor:wait}
+  .weather button:focus-visible{outline:2px solid var(--sun);outline-offset:3px}
+  .weather p{font-size:13px;line-height:1.7;margin-top:9px}
+  .weather .weather-note{color:var(--muted);font-size:11px}
+  .weather .weather-advice{font-size:14px;color:#fff3e8}
 
   .hugbtn{margin-top:4px;font:inherit;font-size:15px;color:#3a1730;cursor:pointer;
     border:none;border-radius:999px;padding:13px 30px;
@@ -114,12 +121,19 @@
 
   <div class="chips" id="chips"></div>
 
+  <section class="weather" aria-label="当地天气与关心建议">
+    <button id="weatherButton" type="button">看看你身边的天气 ☁️</button>
+    <p id="weatherStatus" role="status" aria-live="polite"></p>
+    <p class="weather-advice" id="weatherAdvice" hidden></p>
+    <p class="weather-note">点击后才会请求定位权限；只用附近位置查询天气，不保存位置。</p>
+  </section>
+
   <button class="hugbtn" id="hug">给我一个抱抱 🤍</button>
 </main>
 
 <div class="hearts" id="heartLayer" aria-hidden="true"></div>
 
-<script src="config.js"></script>
+<script src="config.js?v=2"></script>
 <script>
 (function(){
   const cfg = window.COUPLE_CONFIG || {};
@@ -159,20 +173,68 @@
   const lines = (cfg.sweetLines&&cfg.sweetLines.length)?cfg.sweetLines:["有你的每一天都值得纪念。"];
   const out = document.getElementById("typed");
   const reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
-  if(reduce){ out.textContent = lines[0]; }
+  let li=Math.floor(Math.random()*lines.length);
+  if(reduce){ out.textContent = lines[li]; }
   else{
-    let li=0, ci=0;
+    let ci=0;
     (function type(){
       const line = lines[li];
       if(ci<=line.length){ out.textContent = line.slice(0,ci++); setTimeout(type,90); }
       else setTimeout(()=>{ // 停留后清空换下一句
         (function erase(){
           if(ci>0){ out.textContent = line.slice(0,--ci); setTimeout(erase,34); }
-          else{ li=(li+1)%lines.length; setTimeout(type,260); }
+          else{ if(lines.length>1)li=(li+1+Math.floor(Math.random()*(lines.length-1)))%lines.length; setTimeout(type,260); }
         })();
       },1900);
     })();
   }
+
+  // 点击后获取附近天气；只发送约 1 公里精度的坐标，不在本地保存位置。
+  const weatherButton=document.getElementById("weatherButton");
+  const weatherStatus=document.getElementById("weatherStatus");
+  const weatherAdvice=document.getElementById("weatherAdvice");
+  function weatherKind(code){
+    if([95,96,99].includes(code))return "雷雨";
+    if([71,73,75,77,85,86].includes(code))return "下雪";
+    if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code))return "下雨";
+    if([45,48].includes(code))return "有雾";
+    if(code===0)return "晴朗";
+    if([1,2,3].includes(code))return "多云";
+    return "天气变化";
+  }
+  function caringAdvice(current){
+    const feels=Number(current.apparent_temperature);
+    const wind=Number(current.wind_speed_10m);
+    const code=Number(current.weather_code);
+    if([95,96,99].includes(code))return "外面有雷雨，先找安全的地方避一避。等雨小些再走，我想你平安回来。";
+    if([71,73,75,77,85,86].includes(code))return "下雪啦，路上可能会滑，走慢一点，也记得戴好围巾。我想你暖暖地回来。";
+    if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)||Number(current.precipitation)>0)return "外面在下雨，记得带伞，鞋子湿了要早点换。我会惦记着你。";
+    if(feels<=8)return "体感有点冷，出门多穿一件，别让自己冻着。要是我在旁边，就把手给我暖。";
+    if(feels>=30)return "今天挺热，记得喝水、找阴凉处歇一歇。照顾好自己，我会心疼的。";
+    if(wind>=30)return "风有点大，出门记得带件外套，路上慢一点。我想把你照顾得好好的。";
+    if(code===0)return "天气晴朗，适合出去走走。也想和你一起晒晒太阳，听你讲今天的事。";
+    return "不管今天是晴是阴，都记得好好吃饭、照顾自己。我一直想着你。";
+  }
+  weatherButton.addEventListener("click",function(){
+    if(!navigator.geolocation){weatherStatus.textContent="这个浏览器暂时无法定位。";return}
+    weatherButton.disabled=true;weatherStatus.textContent="正在获取附近位置…";weatherAdvice.hidden=true;
+    navigator.geolocation.getCurrentPosition(async function(position){
+      const latitude=Math.round(position.coords.latitude*100)/100;
+      const longitude=Math.round(position.coords.longitude*100)/100;
+      const params=new URLSearchParams({latitude:String(latitude),longitude:String(longitude),current:"temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m",timezone:"auto"});
+      const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);
+      weatherStatus.textContent="正在看看附近的天气…";
+      try{
+        const response=await fetch("https://api.open-meteo.com/v1/forecast?"+params,{signal:controller.signal});
+        if(!response.ok)throw new Error("天气服务暂时不可用");
+        const data=await response.json();if(!data.current)throw new Error("没有查到附近天气");
+        const current=data.current;
+        weatherStatus.textContent="你附近现在"+weatherKind(Number(current.weather_code))+" · "+Math.round(current.temperature_2m)+"°C · 体感 "+Math.round(current.apparent_temperature)+"°C";
+        weatherAdvice.textContent=caringAdvice(current);weatherAdvice.hidden=false;
+      }catch(error){weatherStatus.textContent=error.name==="AbortError"?"天气查询有点慢，请稍后重试。":(error.message||"天气查询失败，请稍后重试。")}
+      finally{clearTimeout(timer);weatherButton.disabled=false}
+    },function(error){weatherButton.disabled=false;weatherStatus.textContent=error.code===1?"没有获得定位权限，允许定位后可以再试一次。":"暂时无法获取位置，请稍后再试。"},{enableHighAccuracy:false,timeout:10000,maximumAge:600000});
+  });
 
   // 萤火虫
   const cv = document.getElementById("fireflies"), ctx = cv.getContext("2d");
